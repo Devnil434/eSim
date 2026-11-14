@@ -20,13 +20,8 @@ from toolcare.core.dependency import (
 )
 from toolcare.core.doctor import SimulationDoctor, DoctorReport, Severity
 from toolcare.core.installer import ToolInstaller, InstallResult
-
-# Gracefully import later phases if available
-try:
-    from toolcare.core.updater import UpdateEngine, UpdatePlan
-    from toolcare.core.config_handler import ConfigHandler
-except ImportError:
-    pass
+from toolcare.core.config_handler import ConfigHandler
+from toolcare.core.updater import UpdateEngine, UpdatePlan
 
 __all__ = [
     "__version__",
@@ -49,4 +44,7 @@ __all__ = [
     "Severity",
     "ToolInstaller",
     "InstallResult",
+    "ConfigHandler",
+    "UpdateEngine",
+    "UpdatePlan",
 ]

@@ -30,13 +30,8 @@ from toolcare.core.doctor import (
     Severity,
 )
 from toolcare.core.installer import ToolInstaller, InstallResult
-
-# Gracefully import later phases if available
-try:
-    from toolcare.core.updater import UpdateEngine, UpdatePlan
-    from toolcare.core.config_handler import ConfigHandler, atomic_write
-except ImportError:
-    pass
+from toolcare.core.config_handler import ConfigHandler, atomic_write
+from toolcare.core.updater import UpdateEngine, UpdatePlan
 
 __all__ = [
     "ToolRegistry",
@@ -66,4 +61,8 @@ __all__ = [
     "Severity",
     "ToolInstaller",
     "InstallResult",
+    "ConfigHandler",
+    "atomic_write",
+    "UpdateEngine",
+    "UpdatePlan",
 ]

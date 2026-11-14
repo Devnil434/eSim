@@ -65,12 +65,12 @@ class ToolInstaller:
         Correction 10: Prefers verified archives over generic package manager binaries
         when eSim-specific components (e.g. XSPICE code models) are required.
         """
-        if preferred_method:
+        if preferred_method and preferred_method.lower() != "auto":
             method_key = preferred_method.lower()
             if method_key not in self.adapters:
                 raise ValueError(
                     f"Unknown installation method '{preferred_method}'. "
-                    f"Supported methods: {', '.join(self.adapters.keys())}."
+                    f"Supported methods: {', '.join(self.adapters.keys())} or 'auto'."
                 )
             return self.adapters[method_key]
 
