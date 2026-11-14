@@ -29,12 +29,12 @@ from toolcare.core.doctor import (
     DoctorCheckItem,
     Severity,
 )
+from toolcare.core.installer import ToolInstaller, InstallResult
 
 # Gracefully import later phases if available
 try:
     from toolcare.core.updater import UpdateEngine, UpdatePlan
     from toolcare.core.config_handler import ConfigHandler, atomic_write
-    from toolcare.core.installer import ToolInstaller, InstallResult
 except ImportError:
     pass
 
@@ -64,4 +64,6 @@ __all__ = [
     "DoctorReport",
     "DoctorCheckItem",
     "Severity",
+    "ToolInstaller",
+    "InstallResult",
 ]

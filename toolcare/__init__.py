@@ -19,12 +19,12 @@ from toolcare.core.dependency import (
     WORKFLOW_NGHDL,
 )
 from toolcare.core.doctor import SimulationDoctor, DoctorReport, Severity
+from toolcare.core.installer import ToolInstaller, InstallResult
 
 # Gracefully import later phases if available
 try:
     from toolcare.core.updater import UpdateEngine, UpdatePlan
     from toolcare.core.config_handler import ConfigHandler
-    from toolcare.core.installer import ToolInstaller, InstallResult
 except ImportError:
     pass
 
@@ -47,4 +47,6 @@ __all__ = [
     "SimulationDoctor",
     "DoctorReport",
     "Severity",
+    "ToolInstaller",
+    "InstallResult",
 ]
