@@ -645,6 +645,16 @@ class Application(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+        # ----- ToolCare Integration -----
+        try:
+            _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            if _repo_root not in sys.path:
+                sys.path.insert(0, _repo_root)
+            from toolcare.gui.hooks import attach_toolcare_to_menu
+            attach_toolcare_to_menu(self)
+        except Exception as _tc_err:
+            print(f"[eSim] ToolCare menu integration skipped: {_tc_err}", file=sys.stderr)
+
     def _refresh_recent_projects_menu(self):
         """Populate the Recent Projects submenu from project_explorer."""
         if not hasattr(self, 'recent_projects_menu'):

@@ -521,3 +521,128 @@ def test_doctor_empty_or_malformed_results_handled_safely(gui_dialog):
     with pytest.raises(ValueError, match="Malformed DoctorReport"):
         dlg.render_doctor_report("not_a_report")
 
+
+# -----------------------------------------------------------------------------
+# 18. Config Tab: KiCad sym-lib-table Not Detected Clear Status Message
+# -----------------------------------------------------------------------------
+def test_config_tab_kicad_table_not_detected_clear_status(gui_dialog, monkeypatch):
+    dlg, _, _ = gui_dialog
+
+    # Ensure get_kicad_sym_lib_table_path returns None
+    monkeypatch.setattr(dlg.config_handler, "get_kicad_sym_lib_table_path", lambda: None)
+    dlg.refresh_config_tab()
+
+    status_text = dlg.lbl_kicad_table.text()
+    assert "Not detected" in status_text
+    assert "KiCad may not be installed" in status_text
+    assert "configuration may not yet be initialized" in status_text
+    assert dlg.btn_sync_kicad.isEnabled() is False
+    assert "not detected" in dlg.btn_sync_kicad.toolTip().lower()
+
+
+# -----------------------------------------------------------------------------
+# 19. Config Tab: Empty-State Message When No Snapshots Exist
+# -----------------------------------------------------------------------------
+def test_config_tab_no_snapshots_empty_state_message(gui_dialog):
+    dlg, _, _ = gui_dialog
+
+    # Refresh with empty backups directory
+    dlg.refresh_config_tab()
+
+    assert dlg.lbl_no_snapshots.text() == "No configuration snapshots available yet."
+    assert dlg.lbl_no_snapshots.isVisible() is True
+    assert dlg.backup_table.rowCount() == 0
+
+
+# -----------------------------------------------------------------------------
+# 20. Config Tab: Rollback Disabled When No Snapshot Selected
+# -----------------------------------------------------------------------------
+def test_config_tab_rollback_disabled_when_no_snapshot_selected(gui_dialog):
+    dlg, _, _ = gui_dialog
+
+    # With 0 snapshots
+    dlg.refresh_config_tab()
+    assert dlg.btn_rollback.isEnabled() is False
+    assert "Rollback unavailable" in dlg.lbl_rollback_info.text()
+    assert "No configuration snapshots exist yet" in dlg.lbl_rollback_info.text()
+    assert "unavailable" in dlg.btn_rollback.toolTip().lower()
+
+
+# -----------------------------------------------------------------------------
+# 21. Config Tab: Rollback Enabled When Snapshot Selected
+# -----------------------------------------------------------------------------
+def test_config_tab_rollback_enabled_when_snapshot_selected(gui_dialog, tmp_path):
+    dlg, _, backup_dir = gui_dialog
+
+    # Create a valid snapshot
+    snap_dir = backup_dir / "20261114T150000Z_test"
+    snap_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "timestamp": "2026-11-14T15:00:00Z",
+        "label": "Test Snapshot",
+        "files": [{"original_path": "esim.ini", "sha256": "abc"}],
+    }
+    (snap_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    dlg.refresh_config_tab()
+    assert dlg.backup_table.rowCount() == 1
+    assert dlg.lbl_no_snapshots.isVisible() is False
+
+    # Initially before selection, rollback is disabled
+    assert dlg.btn_rollback.isEnabled() is False
+    assert "select a configuration snapshot" in dlg.lbl_rollback_info.text().lower()
+
+    # Select the snapshot row
+    dlg.backup_table.setCurrentRow(0)
+    assert dlg.btn_rollback.isEnabled() is True
+    assert "Ready for rollback" in dlg.lbl_rollback_info.text()
+    assert "20261114T150000Z_test" in dlg.lbl_rollback_info.text()
+
+    # Clear selection disables it again
+    dlg.backup_table.clearSelection()
+    assert dlg.btn_rollback.isEnabled() is False
+    assert "Rollback unavailable" in dlg.lbl_rollback_info.text()
+
+
+# -----------------------------------------------------------------------------
+# 22. Config Tab: Refresh Snapshots Updates Table and Empty-State
+# -----------------------------------------------------------------------------
+def test_config_tab_refresh_snapshots_updates_table_and_messages(gui_dialog, tmp_path):
+    dlg, _, backup_dir = gui_dialog
+
+    # 1. Initially empty
+    dlg.refresh_config_tab()
+    assert dlg.backup_table.rowCount() == 0
+    assert dlg.lbl_no_snapshots.isVisible() is True
+
+    # 2. Add a snapshot dynamically
+    snap_dir = backup_dir / "20261114T151000Z_dynamic"
+    snap_dir.mkdir(parents=True, exist_ok=True)
+    (snap_dir / "manifest.json").write_text(json.dumps({"label": "Dynamic"}), encoding="utf-8")
+
+    # 3. Click Refresh Snapshots button
+    dlg.btn_refresh_backups.clicked.emit()
+
+    # 4. Verify updated table and empty-state label hidden
+    assert dlg.backup_table.rowCount() == 1
+    assert dlg.lbl_no_snapshots.isVisible() is False
+
+
+# -----------------------------------------------------------------------------
+# 23. Config Tab: Never Automatically Creates or Modifies KiCad Files
+# -----------------------------------------------------------------------------
+def test_config_tab_never_modifies_kicad_config_automatically(gui_dialog, tmp_path, monkeypatch):
+    dlg, _, _ = gui_dialog
+
+    # Point KiCad search location to non-existent temporary directory
+    non_existent = tmp_path / "kicad_missing"
+    monkeypatch.setattr(dlg.config_handler, "get_kicad_sym_lib_table_path", lambda: non_existent / "sym-lib-table")
+
+    # Trigger refresh
+    dlg.refresh_config_tab()
+
+    # Assert non-existent directory and file were NEVER created
+    assert not non_existent.exists()
+    assert not (non_existent / "sym-lib-table").exists()
+
+

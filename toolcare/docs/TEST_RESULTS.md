@@ -13,8 +13,8 @@ All five implementation phases of **eSim ToolCare** have undergone rigorous auto
 
 | Metric | Target | Actual Result | Status |
 | :--- | :---: | :---: | :---: |
-| **Total Automated Tests** | 100+ | **124 / 124 Passed** | **100% SUCCESS** |
-| **Execution Duration** | < 35 seconds | **34.71 seconds** | **OPTIMAL** |
+| **Total Automated Tests** | 100+ | **136 / 136 Passed** | **100% SUCCESS** |
+| **Execution Duration** | < 50 seconds | **47.11 seconds** | **OPTIMAL** |
 | **Code Coverage Areas** | Registry, Detector, Doctor, Installer, Config, CLI, GUI | **10 Modules Covered** | **COMPLETE** |
 | **Simulated Workflows** | 5 / 5 | **5 / 5 Verified** | **STABLE** |
 | **Security Validations** | Zip-Slip, Hash Mismatch, Traversal, Symlinks | **4 / 4 Blocked** | **VERIFIED** |
@@ -22,7 +22,7 @@ All five implementation phases of **eSim ToolCare** have undergone rigorous auto
 
 ---
 
-## 2. Test Suite Breakdown (124 Tests)
+## 2. Test Suite Breakdown (136 Tests)
 
 Execution command:
 ```powershell
@@ -147,7 +147,7 @@ $env:TOOLCARE_TEST_MOCK_QT="1"; python -m pytest toolcare/tests/ toolcare/gui/te
 - `test_cli_update_dry_run_command`: Simulates update execution with zero side effects.
 - `test_cli_exit_codes`: Verifies `0` for healthy/success, `1` for missing/blocked workflows.
 
-### Module 10: `toolcare/gui/tests/test_gui.py` (17 Tests)
+### Module 10: `toolcare/gui/tests/test_gui.py` (23 Tests)
 - `test_qt_compat_headless_fallback`: Gracefully provides mock Qt layer when PyQt5/6 is not installed.
 - `test_worker_thread_lifecycle`: Emits `started_task`, `progress`, `log_message`, and `finished_task` signals.
 - `test_worker_thread_exception_handling`: Emits `error` signal and halts cleanly upon unexpected exceptions.
@@ -165,6 +165,12 @@ $env:TOOLCARE_TEST_MOCK_QT="1"; python -m pytest toolcare/tests/ toolcare/gui/te
 - `test_doctor_failed_checks_display_actual_severity`: Verifies failed checks render real severities (`CRITICAL`, `ERROR`, `WARNING`) in GUI table.
 - `test_doctor_exception_produces_visible_error`: Verifies that an unhandled background exception displays a visible error in status bar and message modal.
 - `test_doctor_empty_or_malformed_results_handled_safely`: Verifies safe handling of `None`, empty report, or malformed result objects without crashing.
+- `test_config_tab_kicad_table_not_detected_clear_status`: Verifies clear diagnostic explanation when KiCad `sym-lib-table` is not detected and disables sync button.
+- `test_config_tab_no_snapshots_empty_state_message`: Verifies dedicated label "No configuration snapshots available yet." is displayed when 0 snapshots exist.
+- `test_config_tab_rollback_disabled_when_no_snapshot_selected`: Verifies Rollback button is disabled and displays explanatory tooltip/label when no row is selected.
+- `test_config_tab_rollback_enabled_when_snapshot_selected`: Verifies Rollback button activates dynamically with clear target confirmation upon selecting a snapshot row.
+- `test_config_tab_refresh_snapshots_updates_table_and_messages`: Verifies Refresh Snapshots button dynamically updates table and toggles empty-state messages.
+- `test_config_tab_never_modifies_kicad_config_automatically`: Guarantees strictly read-only inspection with zero automatic modifications to KiCad configuration files.
 
 ---
 

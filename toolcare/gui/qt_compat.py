@@ -450,6 +450,9 @@ else:
             pass
 
     class QTableWidget(QWidget):
+        itemSelectionChanged = _MockSignal()
+        cellClicked = _MockSignal(int, int)
+
         def __init__(self, rows=0, cols=0, parent=None):
             super().__init__(parent)
             self._rows = rows
@@ -466,6 +469,8 @@ else:
 
         def setRowCount(self, count: int):
             self._rows = count
+            if self.currentRow() >= count:
+                self.clearSelection()
 
         def rowCount(self) -> int:
             return self._rows
@@ -483,7 +488,15 @@ else:
             return self._selected_rows[0] if self._selected_rows else -1
 
         def setCurrentRow(self, row: int):
-            self._selected_rows = [row]
+            if row >= 0:
+                self._selected_rows = [row]
+            else:
+                self._selected_rows = []
+            self.itemSelectionChanged.emit()
+
+        def clearSelection(self):
+            self._selected_rows = []
+            self.itemSelectionChanged.emit()
 
         def horizontalHeader(self):
             return QHeaderView()

@@ -381,6 +381,7 @@ class ToolCareDialog(QDialog):
         info_layout = QVBoxLayout(info_group)
 
         self.lbl_kicad_table = QLabel("KiCad sym-lib-table: Not checked", info_group)
+        self.lbl_kicad_table.setWordWrap(True)
         info_layout.addWidget(self.lbl_kicad_table)
 
         self.lbl_kicad_symbols = QLabel("eSim Symbol Libraries Registered: 0", info_group)
@@ -407,6 +408,12 @@ class ToolCareDialog(QDialog):
         backup_desc.setWordWrap(True)
         backup_layout.addWidget(backup_desc)
 
+        # Empty-state label when no backup snapshots exist (Requirement 2)
+        self.lbl_no_snapshots = QLabel("No configuration snapshots available yet.", backup_group)
+        self.lbl_no_snapshots.setAlignment(AlignmentCenter)
+        self.lbl_no_snapshots.setVisible(False)
+        backup_layout.addWidget(self.lbl_no_snapshots)
+
         self.backup_table = QTableWidget(0, 4, backup_group)
         self.backup_table.setHorizontalHeaderLabels(["Snapshot ID", "Label", "Files Count", "Integrity Status"])
         header = self.backup_table.horizontalHeader()
@@ -414,10 +421,17 @@ class ToolCareDialog(QDialog):
         header.setSectionResizeMode(1, HeaderResizeStretch)
         header.setSectionResizeMode(2, HeaderResizeContents)
         header.setSectionResizeMode(3, HeaderResizeContents)
+        self.backup_table.itemSelectionChanged.connect(self._on_backup_selection_changed)
         backup_layout.addWidget(self.backup_table)
+
+        # Useful explanation label when rollback is unavailable / ready (Requirement 4)
+        self.lbl_rollback_info = QLabel(backup_group)
+        self.lbl_rollback_info.setWordWrap(True)
+        backup_layout.addWidget(self.lbl_rollback_info)
 
         b_btn_layout = QHBoxLayout()
         self.btn_rollback = QPushButton("Rollback to Selected Snapshot", backup_group)
+        self.btn_rollback.setEnabled(False)  # Requirement 3: Disabled by default
         self.btn_rollback.clicked.connect(self.action_rollback_snapshot)
         b_btn_layout.addWidget(self.btn_rollback)
 
@@ -429,8 +443,54 @@ class ToolCareDialog(QDialog):
         backup_layout.addLayout(b_btn_layout)
         layout.addWidget(backup_group)
 
+    def _on_backup_selection_changed(self):
+        """Handle selection change in backup snapshots table."""
+        self._update_rollback_button_state()
+
+    def _update_rollback_button_state(self):
+        """
+        Update rollback button enabled state and explanatory message.
+        Requirements 3 & 4: Disable Rollback when no snapshot is selected,
+        and show a useful explanation when rollback is unavailable.
+        """
+        cur_row = self.backup_table.currentRow()
+        row_count = self.backup_table.rowCount()
+        has_selection = cur_row >= 0 and cur_row < row_count
+
+        if has_selection:
+            snapshot_item = self.backup_table.item(cur_row, 0)
+            snapshot_name = snapshot_item.text() if snapshot_item else "selected snapshot"
+            self.btn_rollback.setEnabled(True)
+            self.btn_rollback.setToolTip(
+                f"Rollback configuration files to snapshot '{snapshot_name}' after cryptographic SHA-256 verification."
+            )
+            self.lbl_rollback_info.setText(
+                f"Snapshot '{snapshot_name}' selected. Ready for rollback (files will be verified before restoration)."
+            )
+        else:
+            self.btn_rollback.setEnabled(False)
+            if row_count == 0:
+                explanation = (
+                    "Rollback unavailable: No configuration snapshots exist yet. "
+                    "Snapshots are automatically created with cryptographic manifests before updates or symbol synchronization."
+                )
+                tooltip = "Rollback is unavailable: No configuration snapshots available yet."
+            else:
+                explanation = "Rollback unavailable: Please select a configuration snapshot from the table above to restore."
+                tooltip = "Rollback is unavailable: No snapshot selected. Select a snapshot row above."
+
+            self.btn_rollback.setToolTip(tooltip)
+            self.lbl_rollback_info.setText(explanation)
+
     def refresh_config_tab(self):
-        """Inspect KiCad sym-lib-table and enumerate backup snapshots."""
+        """
+        Inspect KiCad sym-lib-table and enumerate backup snapshots.
+        Requirement 6: Never create or modify KiCad configuration automatically.
+        Requirement 1: When no sym-lib-table detected, explain KiCad may not be installed
+        or configuration may not yet be initialized.
+        Requirement 2 & 5: When no snapshots exist, display 'No configuration snapshots available yet'
+        and update table and state.
+        """
         kicad_table = self.config_handler.get_kicad_sym_lib_table_path()
         if kicad_table and kicad_table.is_file():
             self.lbl_kicad_table.setText(f"KiCad sym-lib-table: {kicad_table}")
@@ -440,9 +500,19 @@ class ToolCareDialog(QDialog):
                 self.lbl_kicad_symbols.setText(f"eSim Symbol Libraries Registered: {esim_count}")
             except Exception:
                 self.lbl_kicad_symbols.setText("eSim Symbol Libraries Registered: Error reading table")
+            self.btn_sync_kicad.setEnabled(True)
+            self.btn_sync_kicad.setToolTip("Synchronize and register eSim symbol libraries into KiCad sym-lib-table.")
         else:
-            self.lbl_kicad_table.setText("KiCad sym-lib-table: Not found in standard locations")
-            self.lbl_kicad_symbols.setText("eSim Symbol Libraries Registered: 0")
+            # Requirement 1: Clear status explaining KiCad may not be installed or configuration not yet initialized
+            self.lbl_kicad_table.setText(
+                "KiCad sym-lib-table: Not detected. KiCad may not be installed or its configuration may not yet be initialized. "
+                "(Please install KiCad and launch it once to initialize default configuration files)."
+            )
+            self.lbl_kicad_symbols.setText("eSim Symbol Libraries Registered: 0 (sym-lib-table not detected)")
+            self.btn_sync_kicad.setEnabled(False)
+            self.btn_sync_kicad.setToolTip(
+                "KiCad sym-lib-table not detected. Please install and launch KiCad once before synchronizing."
+            )
 
         # Enumerate backup snapshots
         backups_dir = self.config_handler.backups_dir
@@ -450,27 +520,37 @@ class ToolCareDialog(QDialog):
         if backups_dir.is_dir():
             snapshots = sorted([p for p in backups_dir.iterdir() if p.is_dir()], reverse=True)
 
-        self.backup_table.setRowCount(len(snapshots))
-        for row, s in enumerate(snapshots):
-            manifest_file = s / "manifest.json"
-            label = "None"
-            f_count = "0"
-            integrity = "NO MANIFEST"
+        if len(snapshots) == 0:
+            # Requirement 2: Display empty-state message
+            self.lbl_no_snapshots.setText("No configuration snapshots available yet.")
+            self.lbl_no_snapshots.setVisible(True)
+            self.backup_table.setRowCount(0)
+        else:
+            self.lbl_no_snapshots.setVisible(False)
+            self.backup_table.setRowCount(len(snapshots))
+            for row, s in enumerate(snapshots):
+                manifest_file = s / "manifest.json"
+                label = "None"
+                f_count = "0"
+                integrity = "NO MANIFEST"
 
-            if manifest_file.is_file():
-                try:
-                    data = json.loads(manifest_file.read_text(encoding="utf-8"))
-                    label = data.get("label", "") or "unlabeled"
-                    files = data.get("files", [])
-                    f_count = str(len(files))
-                    integrity = "VALID MANIFEST"
-                except Exception:
-                    integrity = "CORRUPT MANIFEST"
+                if manifest_file.is_file():
+                    try:
+                        data = json.loads(manifest_file.read_text(encoding="utf-8"))
+                        label = data.get("label", "") or "unlabeled"
+                        files = data.get("files", [])
+                        f_count = str(len(files))
+                        integrity = "VALID MANIFEST"
+                    except Exception:
+                        integrity = "CORRUPT MANIFEST"
 
-            self.backup_table.setItem(row, 0, QTableWidgetItem(s.name))
-            self.backup_table.setItem(row, 1, QTableWidgetItem(label))
-            self.backup_table.setItem(row, 2, QTableWidgetItem(f_count))
-            self.backup_table.setItem(row, 3, QTableWidgetItem(integrity))
+                self.backup_table.setItem(row, 0, QTableWidgetItem(s.name))
+                self.backup_table.setItem(row, 1, QTableWidgetItem(label))
+                self.backup_table.setItem(row, 2, QTableWidgetItem(f_count))
+                self.backup_table.setItem(row, 3, QTableWidgetItem(integrity))
+
+        # Requirements 3 & 4: Update rollback button state and explanations
+        self._update_rollback_button_state()
 
     # -------------------------------------------------------------------------
     # Tab 4: Audit & Update Logs
@@ -584,15 +664,19 @@ class ToolCareDialog(QDialog):
         self.btn_update_tool.setEnabled(not busy)
         self.btn_install_tool.setEnabled(not busy)
         self.btn_run_doctor.setEnabled(not busy)
-        self.btn_sync_kicad.setEnabled(not busy)
-        self.btn_rollback.setEnabled(not busy)
+        has_kicad = bool(self.config_handler.get_kicad_sym_lib_table_path())
+        self.btn_sync_kicad.setEnabled(not busy and has_kicad)
 
         if busy:
+            self.btn_rollback.setEnabled(False)
             self.lbl_status.setText(f"Executing: {task_name}...")
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)  # Indeterminate progress
         else:
             self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self._update_rollback_button_state()
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
 
@@ -761,8 +845,13 @@ class ToolCareDialog(QDialog):
     def action_rollback_snapshot(self):
         """Rollback configuration to selected snapshot with integrity verification."""
         cur_row = self.backup_table.currentRow()
-        if cur_row < 0:
-            QMessageBox.information(self, "No Snapshot Selected", "Please select a backup snapshot from the table.")
+        if cur_row < 0 or cur_row >= self.backup_table.rowCount():
+            QMessageBox.information(
+                self,
+                "Rollback Unavailable",
+                "Rollback is unavailable because no configuration snapshot is selected.\n\n"
+                "Please select a configuration snapshot row from the table to proceed.",
+            )
             return
 
         snapshot_id_item = self.backup_table.item(cur_row, 0)

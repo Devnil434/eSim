@@ -51,6 +51,15 @@ def launch_gui(parent=None) -> int:
         owns_app = True
 
     from toolcare.gui.dialog import ToolCareDialog
+
+    if parent is not None and hasattr(parent, "children"):
+        for child in parent.children():
+            if isinstance(child, ToolCareDialog):
+                child.show()
+                child.raise_()
+                child.activateWindow()
+                return 0
+
     dialog = ToolCareDialog(parent=parent)
     dialog.show()
 

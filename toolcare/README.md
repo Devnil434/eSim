@@ -62,7 +62,7 @@ toolcare/
 ├── docs/
 │   ├── DESIGN_DOCUMENT.md      # Full architectural specification
 │   ├── ROADMAP.md              # 5-phase execution roadmap
-│   └── TEST_RESULTS.md         # Full test execution audit log (102 tests passing)
+│   └── TEST_RESULTS.md         # Full test execution audit log (136 tests passing)
 └── gui/                        # PyQt5/PyQt6 user interface layer
     ├── __init__.py             # GUI launcher (`python -m toolcare --gui`)
     ├── qt_compat.py            # PyQt5/PyQt6 abstraction with headless mock fallback
@@ -189,7 +189,7 @@ $env:TOOLCARE_TEST_MOCK_QT="1"; python -m pytest toolcare/tests/ toolcare/gui/te
 TOOLCARE_TEST_MOCK_QT=1 python -m pytest toolcare/tests/ toolcare/gui/tests/ -v
 ```
 
-**Result:** `124 passed in 34.71s (100% pass rate)`.
+**Result:** `136 passed in 47.11s (100% pass rate)`.
 
 ---
 
@@ -230,7 +230,7 @@ All additions are isolated in the self-contained `toolcare/` package. **Zero ori
 - `toolcare/gui/worker.py`: QThread worker with Qt signals.
 - `toolcare/gui/dialog.py`: 4-tab Qt management dialog.
 - `toolcare/gui/hooks.py`: eSim menu integration hook.
-- `toolcare/tests/`: Unit test suite (10 test files, 102 tests).
+- `toolcare/tests/`: Unit test suite (10 test files, 136 tests collected).
 - `toolcare/docs/DESIGN_DOCUMENT.md`: Architectural design specification.
 - `toolcare/docs/ROADMAP.md`: Phase-by-phase implementation roadmap.
 - `toolcare/docs/TEST_RESULTS.md`: Complete audit and test log.
