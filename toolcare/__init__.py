@@ -8,11 +8,20 @@ __author__ = "eSim Team / FOSSEE Task 5 Submission"
 from toolcare.core.registry import ToolRegistry, ToolSpec
 from toolcare.core.detector import ToolDetector, ToolDetectionResult
 from toolcare.core.version import ToolStatus, VersionEvaluation
+from toolcare.core.dependency import (
+    DependencyGraph,
+    WorkflowSpec,
+    WorkflowStatus,
+    WORKFLOW_SIMULATION,
+    WORKFLOW_VERIFIER,
+    WORKFLOW_DCOSIM,
+    WORKFLOW_NGVERI,
+    WORKFLOW_NGHDL,
+)
+from toolcare.core.doctor import SimulationDoctor, DoctorReport, Severity
 
 # Gracefully import later phases if available
 try:
-    from toolcare.core.dependency import DependencyGraph, FlowStatus
-    from toolcare.core.doctor import SimulationDoctor, DoctorReport
     from toolcare.core.updater import UpdateEngine, UpdatePlan
     from toolcare.core.config_handler import ConfigHandler
     from toolcare.core.installer import ToolInstaller, InstallResult
@@ -27,4 +36,15 @@ __all__ = [
     "ToolDetectionResult",
     "ToolStatus",
     "VersionEvaluation",
+    "DependencyGraph",
+    "WorkflowSpec",
+    "WorkflowStatus",
+    "WORKFLOW_SIMULATION",
+    "WORKFLOW_VERIFIER",
+    "WORKFLOW_DCOSIM",
+    "WORKFLOW_NGVERI",
+    "WORKFLOW_NGHDL",
+    "SimulationDoctor",
+    "DoctorReport",
+    "Severity",
 ]

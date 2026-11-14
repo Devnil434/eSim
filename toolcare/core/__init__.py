@@ -11,11 +11,27 @@ from toolcare.core.version import (
     evaluate_compatibility,
 )
 from toolcare.core.detector import ToolDetector, ToolDetectionResult
+from toolcare.core.dependency import (
+    DependencyGraph,
+    WorkflowSpec,
+    WorkflowStatus,
+    ToolRequirement,
+    ALL_WORKFLOW_IDS,
+    WORKFLOW_SIMULATION,
+    WORKFLOW_VERIFIER,
+    WORKFLOW_DCOSIM,
+    WORKFLOW_NGVERI,
+    WORKFLOW_NGHDL,
+)
+from toolcare.core.doctor import (
+    SimulationDoctor,
+    DoctorReport,
+    DoctorCheckItem,
+    Severity,
+)
 
 # Gracefully import later phases if available
 try:
-    from toolcare.core.dependency import DependencyGraph, FlowStatus, ALL_FLOWS, FLOW_LABELS
-    from toolcare.core.doctor import SimulationDoctor, DoctorReport, DoctorCheckItem
     from toolcare.core.updater import UpdateEngine, UpdatePlan
     from toolcare.core.config_handler import ConfigHandler, atomic_write
     from toolcare.core.installer import ToolInstaller, InstallResult
@@ -34,4 +50,18 @@ __all__ = [
     "evaluate_compatibility",
     "ToolDetector",
     "ToolDetectionResult",
+    "DependencyGraph",
+    "WorkflowSpec",
+    "WorkflowStatus",
+    "ToolRequirement",
+    "ALL_WORKFLOW_IDS",
+    "WORKFLOW_SIMULATION",
+    "WORKFLOW_VERIFIER",
+    "WORKFLOW_DCOSIM",
+    "WORKFLOW_NGVERI",
+    "WORKFLOW_NGHDL",
+    "SimulationDoctor",
+    "DoctorReport",
+    "DoctorCheckItem",
+    "Severity",
 ]
