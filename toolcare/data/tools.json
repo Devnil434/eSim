@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "2.0.0",
+  "tools": {
+    "ngspice": {
+      "id": "ngspice",
+      "name": "Ngspice Simulator",
+      "category": "analog",
+      "executables": {
+        "windows": ["ngspice.exe", "spice64.exe"],
+        "linux": ["ngspice"],
+        "darwin": ["ngspice"]
+      },
+      "version_command": ["--version"],
+      "version_regex": "ngspice.*?([0-9]+(?:\\.[0-9]+)*)",
+      "compatibility": {
+        "min_version": "38.0",
+        "recommended_version": "45.2",
+        "max_version": "46.0",
+        "notes": "Must have /lib/ngspice/ containing XSPICE .cm code models, ivlng adapter for Verilog, and ghdl.cm for VHDL."
+      },
+      "package_ids": {
+        "winget": "Ngspice.Ngspice",
+        "apt": "ngspice",
+        "choco": "UNVERIFIED",
+        "brew": "ngspice"
+      },
+      "archives": {
+        "windows_x64": {
+          "url": "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/45.2/ngspice-45.2_64.7z",
+          "sha256": "6a0c44056e7f2aae9bd6b3f5a74d1846fcf1e5d4470b01a89429629cfd0a0942",
+          "archive_type": "7z",
+          "strip_components": 1
+        }
+      },
+      "critical_components": ["ivlng", "spice2poly.cm", "analog.cm", "digital.cm", "ghdl.cm"]
+    },
+    "kicad": {
+      "id": "kicad",
+      "name": "KiCad EDA Suite",
+      "category": "core",
+      "executables": {
+        "windows": ["kicad.exe"],
+        "linux": ["kicad"],
+        "darwin": ["kicad"]
+      },
+      "version_command": ["--version"],
+      "version_regex": "([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)",
+      "compatibility": {
+        "min_version": "7.0.0",
+        "recommended_version": "9.0.3",
+        "max_version": "9.9.9",
+        "notes": "Requires eSim symbol libraries (eSim_Subckt, eSim_Ngveri, eSim_Nghdl) registered in sym-lib-table. KiCad < 7 is incompatible."
+      },
+      "package_ids": {
+        "winget": "KiCad.KiCad",
+        "apt": "kicad",
+        "choco": "kicad",
+        "brew": "kicad"
+      },
+      "archives": {
+        "windows_x64": {
+          "url": "https://kicad-downloads.s3.cern.ch/windows/stable/kicad-9.0.3-x86_64.exe",
+          "sha256": "582635ced855b399222c54d1d6a6bbdaaa7e914040dafa8915570077c4aa8bfe",
+          "archive_type": "exe",
+          "strip_components": 0
+        }
+      },
+      "critical_components": ["eeschema", "pcbnew", "sym-lib-table"]
+    },
+    "iverilog": {
+      "id": "iverilog",
+      "name": "Icarus Verilog",
+      "category": "digital",
+      "executables": {
+        "windows": ["iverilog.exe"],
+        "linux": ["iverilog"],
+        "darwin": ["iverilog"]
+      },
+      "version_command": ["-V"],
+      "version_regex": "version ([0-9]+(?:\\.[0-9]+)*)",
+      "compatibility": {
+        "min_version": "10.0",
+        "recommended_version": "12.0",
+        "max_version": "13.0",
+        "notes": "d_cosim requires libvvp (libvvp.so / libvvp.dll) exported for dynamic loading by Ngspice ivlng adapter."
+      },
+      "package_ids": {
+        "winget": "UNVERIFIED",
+        "apt": "iverilog",
+        "choco": "iverilog",
+        "brew": "icarus-verilog"
+      },
+      "archives": {
+        "windows_x64": {
+          "url": "http://bleyer.org/icarus/iverilog-v12-20220611-x64_setup.exe",
+          "sha256": "a614057374dfb2ecb72f10d48aa7d9796ffdbb9e6e87ef46b4122d4217ee9256",
+          "archive_type": "exe",
+          "strip_components": 0
+        }
+      },
+      "critical_components": ["vvp", "libvvp"]
+    },
+    "ghdl": {
+      "id": "ghdl",
+      "name": "GHDL VHDL Simulator",
+      "category": "digital",
+      "executables": {
+        "windows": ["ghdl.exe"],
+        "linux": ["ghdl"],
+        "darwin": ["ghdl"]
+      },
+      "version_command": ["--version"],
+      "version_regex": "GHDL\\s+([0-9]+(?:\\.[0-9]+)*)",
+      "compatibility": {
+        "min_version": "2.0.0",
+        "recommended_version": "4.1.0",
+        "max_version": "5.5.0",
+        "notes": "Must use LLVM backend. The mcode backend crashes eSim socket co-simulation."
+      },
+      "package_ids": {
+        "winget": "UNVERIFIED",
+        "apt": "ghdl-llvm",
+        "choco": "UNVERIFIED",
+        "brew": "ghdl"
+      },
+      "archives": {
+        "windows_x64": {
+          "url": "UNVERIFIED",
+          "sha256": "UNVERIFIED",
+          "archive_type": "tar.zst",
+          "strip_components": 1
+        }
+      },
+      "critical_components": ["ghdl-llvm", "ghdl.cm"]
+    },
+    "verilator": {
+      "id": "verilator",
+      "name": "Verilator Simulator",
+      "category": "digital",
+      "executables": {
+        "windows": ["verilator.exe"],
+        "linux": ["verilator"],
+        "darwin": ["verilator"]
+      },
+      "version_command": ["--version"],
+      "version_regex": "Verilator\\s+([0-9]+\\.[0-9]+)",
+      "compatibility": {
+        "min_version": "5.006",
+        "recommended_version": "5.032",
+        "max_version": "5.999",
+        "notes": "Verilator 4 is unsupported; requires Verilator 5+ for C++ testbench generation."
+      },
+      "package_ids": {
+        "winget": "UNVERIFIED",
+        "apt": "verilator",
+        "choco": "UNVERIFIED",
+        "brew": "verilator"
+      },
+      "archives": {
+        "windows_x64": {
+          "url": "UNVERIFIED",
+          "sha256": "UNVERIFIED",
+          "archive_type": "tar.gz",
+          "strip_components": 1
+        }
+      },
+      "critical_components": ["verilator_bin", "verilator_coverage"]
+    },
+    "llvm": {
+      "id": "llvm",
+      "name": "LLVM / Clang Toolchain",
+      "category": "system",
+      "executables": {
+        "windows": ["clang.exe", "llvm-config.exe"],
+        "linux": ["clang"],
+        "darwin": ["clang"]
+      },
+      "version_command": ["--version"],
+      "version_regex": "clang version ([0-9]+(?:\\.[0-9]+)*)",
+      "compatibility": {
+        "min_version": "14.0",
+        "recommended_version": "18.1.8",
+        "max_version": "20.0",
+        "notes": "Required for compiling GHDL LLVM backend models and C++ co-simulation bridges."
+      },
+      "package_ids": {
+        "winget": "LLVM.LLVM",
+        "apt": "clang",
+        "choco": "llvm",
+        "brew": "llvm"
+      },
+      "archives": {
+        "windows_x64": {
+          "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe",
+          "sha256": "UNVERIFIED",
+          "archive_type": "exe",
+          "strip_components": 0
+        }
+      },
+      "critical_components": ["clang", "llvm-config"]
+    }
+  }
+}
