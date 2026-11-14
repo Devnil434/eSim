@@ -26,7 +26,7 @@ os.environ["TOOLCARE_TEST_MOCK_QT"] = "1"
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from toolcare.core.config_handler import ConfigHandler, atomic_write
-from toolcare.core.dependency import WorkflowStatus
+from toolcare.core.dependency import ALL_WORKFLOW_IDS, WorkflowStatus
 from toolcare.core.doctor import DoctorCheckItem, DoctorReport, Severity
 from toolcare.gui import attach_toolcare_to_menu, launch_gui
 from toolcare.gui.dialog import ToolCareDialog
@@ -338,3 +338,186 @@ def test_clear_log_view_does_not_delete_persistent_disk_logs(gui_dialog, tmp_pat
     # Disk file must still exist and be untouched
     assert log_file.is_file()
     assert "Persistent log audit line" in log_file.read_text(encoding="utf-8")
+
+
+# -----------------------------------------------------------------------------
+# 13. Doctor Regression: All 12 Diagnostic Results Reach the GUI Table
+# -----------------------------------------------------------------------------
+def test_doctor_all_12_checks_reach_gui_table(gui_dialog):
+    dlg, _, _ = gui_dialog
+
+    # Trigger action_run_doctor
+    dlg.action_run_doctor()
+
+    # Verify all 12 diagnostic check results populate the doctor_table
+    assert dlg.doctor_table.rowCount() == 12
+    assert dlg.doctor_table.columnCount() == 6
+
+    # Verify every row contains valid Stage, Check Name, Result, Severity, Details, Remediation
+    stages_seen = set()
+    for row in range(12):
+        stage = dlg.doctor_table.item(row, 0).text()
+        check_name = dlg.doctor_table.item(row, 1).text()
+        result = dlg.doctor_table.item(row, 2).text()
+        severity = dlg.doctor_table.item(row, 3).text()
+        details = dlg.doctor_table.item(row, 4).text()
+        remediation = dlg.doctor_table.item(row, 5).text()
+
+        assert stage, f"Row {row} missing stage"
+        assert check_name, f"Row {row} missing check_name"
+        assert result in ("PASS", "FAIL"), f"Row {row} unexpected result: {result}"
+        assert severity in ("INFO", "WARNING", "ERROR", "CRITICAL"), f"Row {row} unexpected severity: {severity}"
+        assert details, f"Row {row} missing details"
+        assert remediation, f"Row {row} missing remediation"
+        stages_seen.add(stage)
+
+    # All 5 stages must be represented
+    assert len(stages_seen) == 5
+
+
+# -----------------------------------------------------------------------------
+# 14. Doctor Regression: All Five Workflow Readiness Values Rendered
+# -----------------------------------------------------------------------------
+def test_doctor_all_five_workflows_rendered(gui_dialog):
+    dlg, _, _ = gui_dialog
+
+    # Initially, cards display [UNKNOWN]
+    for wf_id in ALL_WORKFLOW_IDS:
+        assert "[UNKNOWN]" in dlg.wf_labels[wf_id].text()
+
+    # Trigger action_run_doctor
+    dlg.action_run_doctor()
+
+    # After diagnostic audit, none of the 5 cards should remain [UNKNOWN]
+    for wf_id in ALL_WORKFLOW_IDS:
+        lbl_text = dlg.wf_labels[wf_id].text()
+        assert "[UNKNOWN]" not in lbl_text, f"Workflow {wf_id} unexpectedly remained UNKNOWN"
+        assert any(status in lbl_text for status in ("HEALTHY", "READY", "BLOCKED", "DEGRADED"))
+
+
+# -----------------------------------------------------------------------------
+# 15. Doctor Regression: Failed Checks Display Real Severity and Remediation
+# -----------------------------------------------------------------------------
+def test_doctor_failed_checks_display_actual_severity(gui_dialog):
+    dlg, _, _ = gui_dialog
+
+    # Build mock report with specific failing items of different severities
+    mock_items = [
+        DoctorCheckItem(
+            stage="Stage 2: Analog Simulation",
+            check_name="Ngspice Executable",
+            passed=False,
+            severity=Severity.CRITICAL,
+            details="Ngspice binary not located.",
+            remediation="Install Ngspice 45.2.0.",
+        ),
+        DoctorCheckItem(
+            stage="Stage 3: Digital Simulation",
+            check_name="Icarus Verilog Executable",
+            passed=False,
+            severity=Severity.ERROR,
+            details="iverilog binary not found.",
+            remediation="Install Icarus Verilog v12.",
+        ),
+        DoctorCheckItem(
+            stage="Stage 4: VHDL & Compiler",
+            check_name="LLVM / Clang Toolchain",
+            passed=False,
+            severity=Severity.WARNING,
+            details="Clang compiler missing.",
+            remediation="Install LLVM toolchain.",
+        ),
+    ]
+
+    mock_report = DoctorReport(
+        items=mock_items,
+        overall_health=False,
+        has_critical=True,
+        total_checks=3,
+        passed_checks=0,
+        failed_checks=3,
+        workflow_readiness={},
+        verified_components={},
+    )
+
+    dlg.render_doctor_report(mock_report)
+
+    assert dlg.doctor_table.rowCount() == 3
+    # Check row 0 (CRITICAL)
+    assert dlg.doctor_table.item(0, 2).text() == "FAIL"
+    assert dlg.doctor_table.item(0, 3).text() == "CRITICAL"
+    assert "Install Ngspice 45.2.0." in dlg.doctor_table.item(0, 5).text()
+
+    # Check row 1 (ERROR)
+    assert dlg.doctor_table.item(1, 2).text() == "FAIL"
+    assert dlg.doctor_table.item(1, 3).text() == "ERROR"
+    assert "Install Icarus Verilog v12." in dlg.doctor_table.item(1, 5).text()
+
+    # Check row 2 (WARNING)
+    assert dlg.doctor_table.item(2, 2).text() == "FAIL"
+    assert dlg.doctor_table.item(2, 3).text() == "WARNING"
+
+
+# -----------------------------------------------------------------------------
+# 16. Doctor Regression: Exception Produces Visible Error in Status and Modal
+# -----------------------------------------------------------------------------
+def test_doctor_exception_produces_visible_error(gui_dialog, monkeypatch):
+    dlg, _, _ = gui_dialog
+
+    # Mock SimulationDoctor.run_diagnostics to raise an exception
+    class BrokenDoctor:
+        def __init__(self, *args, **kwargs):
+            pass
+        def run_diagnostics(self):
+            raise RuntimeError("Hardware diagnostic bus I/O failure")
+
+    monkeypatch.setattr("toolcare.gui.dialog.SimulationDoctor", BrokenDoctor)
+
+    critical_messages = []
+    with patch.object(QMessageBox, "critical", lambda parent, title, msg: critical_messages.append((title, msg))):
+        dlg.action_run_doctor()
+
+    # Verify status bar displays visible error
+    assert "Error:" in dlg.lbl_status.text()
+    assert "Hardware diagnostic bus I/O failure" in dlg.lbl_status.text()
+
+    # Verify critical message box was shown
+    assert len(critical_messages) == 1
+    assert "Operation Failed" in critical_messages[0][0]
+    assert "Hardware diagnostic bus I/O failure" in critical_messages[0][1]
+
+
+# -----------------------------------------------------------------------------
+# 17. Doctor Regression: Empty or Malformed Results Handled Safely
+# -----------------------------------------------------------------------------
+def test_doctor_empty_or_malformed_results_handled_safely(gui_dialog):
+    import pytest
+    dlg, _, _ = gui_dialog
+
+    # 1. Test None report: must not crash, must preserve UNKNOWN
+    dlg.render_doctor_report(None)
+    for wf_id in ALL_WORKFLOW_IDS:
+        assert "[UNKNOWN]" in dlg.wf_labels[wf_id].text()
+    assert dlg.doctor_table.rowCount() == 0
+
+    # 2. Test Empty DoctorReport: must not crash
+    empty_report = DoctorReport(
+        items=[],
+        overall_health=True,
+        has_critical=False,
+        total_checks=0,
+        passed_checks=0,
+        failed_checks=0,
+        workflow_readiness={},
+        verified_components={},
+    )
+    dlg.render_doctor_report(empty_report)
+    assert dlg.doctor_table.rowCount() == 0
+    # Any workflow not in readiness dictionary must display UNKNOWN
+    for wf_id in ALL_WORKFLOW_IDS:
+        assert "[UNKNOWN]" in dlg.wf_labels[wf_id].text()
+
+    # 3. Test malformed object (missing items or workflow_readiness)
+    with pytest.raises(ValueError, match="Malformed DoctorReport"):
+        dlg.render_doctor_report("not_a_report")
+

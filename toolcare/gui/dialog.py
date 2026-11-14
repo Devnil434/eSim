@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from toolcare import __version__
 from toolcare.core.config_handler import ConfigHandler, ConfigSecurityError
@@ -245,10 +245,24 @@ class ToolCareDialog(QDialog):
 
         layout.addWidget(wf_group)
 
-        # Doctor Checks Tree
+        # Doctor Checks Table (Displays all 12 checks with real Severity, Result, Details, Remediation)
+        self.doctor_table = QTableWidget(0, 6, parent)
+        self.doctor_table.setHorizontalHeaderLabels([
+            "Stage", "Diagnostic Check", "Result", "Severity", "Details", "Remediation"
+        ])
+        header = self.doctor_table.horizontalHeader()
+        header.setSectionResizeMode(0, HeaderResizeContents)
+        header.setSectionResizeMode(1, HeaderResizeContents)
+        header.setSectionResizeMode(2, HeaderResizeContents)
+        header.setSectionResizeMode(3, HeaderResizeContents)
+        header.setSectionResizeMode(4, HeaderResizeStretch)
+        header.setSectionResizeMode(5, HeaderResizeStretch)
+        layout.addWidget(self.doctor_table)
+
+        # Retain doctor_tree for stage-hierarchical view and backward compatibility
         self.doctor_tree = QTreeWidget(parent)
         self.doctor_tree.setHeaderLabels(["Diagnostic Check", "Result", "Severity", "Details & Remediation"])
-        layout.addWidget(self.doctor_tree)
+        self.doctor_tree.setVisible(False)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -259,21 +273,84 @@ class ToolCareDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
-    def render_doctor_report(self, report: DoctorReport):
-        """Render doctor report into workflow badges and tree widget."""
-        # 1. Update workflow readiness badges
-        for wf_id, status in report.workflow_readiness.items():
-            lbl = self.wf_labels.get(wf_id)
-            if lbl:
-                if status.is_runnable:
-                    lbl.setText(f"{wf_id}: READY [OK]")
-                    lbl.setToolTip(f"Workflow '{status.workflow_name}' is fully runnable.")
-                else:
-                    reasons = "; ".join(status.diagnostic_messages)
-                    lbl.setText(f"{wf_id}: BLOCKED")
-                    lbl.setToolTip(f"Blocked: {reasons}")
+    def render_doctor_report(self, report: Optional[DoctorReport]):
+        """
+        Render doctor report into workflow badges, diagnostic table, and tree widget.
+        Keeps all widget updates strictly on the GUI thread.
+        """
+        if report is None:
+            logger.warning("render_doctor_report called with None. Preserving UNKNOWN workflow states.")
+            for wf_id in ALL_WORKFLOW_IDS:
+                if wf_id in self.wf_labels:
+                    self.wf_labels[wf_id].setText(f"{wf_id}: [UNKNOWN]")
+            self.doctor_table.setRowCount(0)
+            self.doctor_tree.clear()
+            return
 
-        # 2. Update tree widget grouped by stage
+        if not hasattr(report, "workflow_readiness") or not hasattr(report, "items"):
+            raise ValueError("Malformed DoctorReport provided: missing workflow_readiness or items attribute.")
+
+        # Correction 7: Debug logging for result counts and workflow readiness values
+        logger.debug(
+            "Rendering Doctor report: %d total checks (%d passed, %d failed). Workflow readiness evaluated for %d workflows.",
+            report.total_checks,
+            report.passed_checks,
+            report.failed_checks,
+            len(report.workflow_readiness),
+        )
+
+        # 1. Update workflow readiness badges
+        for wf_id in ALL_WORKFLOW_IDS:
+            lbl = self.wf_labels.get(wf_id)
+            if not lbl:
+                continue
+            status = report.workflow_readiness.get(wf_id)
+            if status is None:
+                # Correction 4: Preserve UNKNOWN only when underlying status genuinely cannot be determined
+                lbl.setText(f"{wf_id}: [UNKNOWN]")
+                lbl.setToolTip("Workflow status could not be determined.")
+                logger.debug("Workflow '%s' readiness: UNKNOWN", wf_id)
+            elif status.is_runnable:
+                if status.missing_optional_tools:
+                    missing_opt = ", ".join(status.missing_optional_tools)
+                    lbl.setText(f"{wf_id}: DEGRADED")
+                    lbl.setToolTip(f"Workflow '{status.workflow_name}' is runnable, but optional tools are missing ({missing_opt}).")
+                    logger.debug("Workflow '%s' readiness: DEGRADED (missing optional: %s)", wf_id, missing_opt)
+                else:
+                    lbl.setText(f"{wf_id}: HEALTHY [READY]")
+                    lbl.setToolTip(f"Workflow '{status.workflow_name}' is fully runnable.")
+                    logger.debug("Workflow '%s' readiness: HEALTHY [READY]", wf_id)
+            else:
+                reasons = "; ".join(status.diagnostic_messages) if status.diagnostic_messages else "Dependencies unsatisfied."
+                lbl.setText(f"{wf_id}: BLOCKED")
+                lbl.setToolTip(f"Blocked: {reasons}")
+                logger.debug("Workflow '%s' readiness: BLOCKED (%s)", wf_id, reasons)
+
+        # 2. Update diagnostic results table (Correction 1 & 2: Display all checks with real severity and remediation)
+        self.doctor_table.setRowCount(len(report.items))
+        for row, it in enumerate(report.items):
+            res_str = "PASS" if it.passed else "FAIL"
+            sev_str = it.severity.value if hasattr(it.severity, "value") else str(it.severity)
+            remed_str = it.remediation or "None"
+
+            item_stage = QTableWidgetItem(it.stage)
+            item_check = QTableWidgetItem(it.check_name)
+            item_result = QTableWidgetItem(res_str)
+            item_sev = QTableWidgetItem(sev_str)
+            item_details = QTableWidgetItem(it.details)
+            item_remed = QTableWidgetItem(remed_str)
+
+            item_result.setTextAlignment(AlignmentCenter)
+            item_sev.setTextAlignment(AlignmentCenter)
+
+            self.doctor_table.setItem(row, 0, item_stage)
+            self.doctor_table.setItem(row, 1, item_check)
+            self.doctor_table.setItem(row, 2, item_result)
+            self.doctor_table.setItem(row, 3, item_sev)
+            self.doctor_table.setItem(row, 4, item_details)
+            self.doctor_table.setItem(row, 5, item_remed)
+
+        # 3. Update tree widget grouped by stage
         self.doctor_tree.clear()
         stages: Dict[str, List] = {}
         for it in report.items:
@@ -283,7 +360,7 @@ class ToolCareDialog(QDialog):
             stage_node = QTreeWidgetItem([stage_name, "", "", ""])
             for it in stage_items:
                 res_str = "PASS" if it.passed else "FAIL"
-                sev_str = it.severity.value
+                sev_str = it.severity.value if hasattr(it.severity, "value") else str(it.severity)
                 details = it.details
                 if not it.passed and it.remediation:
                     details += f" | Remediation: {it.remediation}"
@@ -455,7 +532,15 @@ class ToolCareDialog(QDialog):
     # -------------------------------------------------------------------------
     # Asynchronous Actions & Worker Dispatch
     # -------------------------------------------------------------------------
-    def _start_worker(self, task_name: str, task_func, *args, **kwargs) -> bool:
+    def _start_worker(
+        self,
+        task_name: str,
+        task_func,
+        *args,
+        on_result: Optional[Callable[[Any], None]] = None,
+        on_finished: Optional[Callable[[bool, str], None]] = None,
+        **kwargs,
+    ) -> bool:
         """
         Safely start a background worker, preventing concurrent operations.
         Requirement 4: Prevent multiple conflicting install/update/config operations.
@@ -473,11 +558,22 @@ class ToolCareDialog(QDialog):
         worker = WorkerThread(task_name, task_func, *args, parent=self, **kwargs)
         self._active_worker = worker
 
-        # Connect signals
+        # Connect signals BEFORE starting thread
         worker.started_task.connect(self._on_worker_started)
         worker.progress.connect(self._on_worker_progress)
         worker.log_message.connect(self._on_worker_log)
-        worker.finished_task.connect(self._on_worker_finished)
+
+        if on_result:
+            worker.result_ready.connect(on_result)
+
+        def handle_finished(success: bool, msg: str):
+            try:
+                if on_finished:
+                    on_finished(success, msg)
+            finally:
+                self._on_worker_finished(success, msg)
+
+        worker.finished_task.connect(handle_finished)
 
         worker.start()
         return True
@@ -626,24 +722,29 @@ class ToolCareDialog(QDialog):
 
     def action_run_doctor(self):
         """Asynchronously run 5-stage simulation doctor audit."""
-        def doctor_task(worker: WorkerThread):
+        def doctor_task(worker: WorkerThread) -> DoctorReport:
             worker.log("Running comprehensive 5-stage health diagnostic audit...")
-            doc = SimulationDoctor()
+            doc = SimulationDoctor(detector=self.detector, dep_graph=self.dep_graph)
             report = doc.run_diagnostics()
-            worker._last_report = report
-            return f"Diagnostic audit complete ({report.passed_checks}/{report.total_checks} checks passed)."
+            logger.debug(
+                "Doctor audit complete: %d checks generated, %d workflows evaluated.",
+                report.total_checks,
+                len(report.workflow_readiness),
+            )
+            return report
 
-        def on_finished(success: bool, msg: str):
-            if success and hasattr(self, "_last_doctor_report"):
-                self.render_doctor_report(self._last_doctor_report)
+        def handle_doctor_result(report: Any):
+            logger.debug("handle_doctor_result called on GUI thread with object: %s", type(report))
+            if isinstance(report, DoctorReport):
+                self.render_doctor_report(report)
+            elif report is not None:
+                logger.warning("Unexpected doctor result type received: %s", type(report))
 
-        if self._start_worker("Simulation Health Doctor", doctor_task):
-            if self._active_worker:
-                # Store report reference on dialog upon completion
-                def capture_report(success: bool, msg: str):
-                    if success and self._active_worker and hasattr(self._active_worker, "_last_report"):
-                        self.render_doctor_report(self._active_worker._last_report)
-                self._active_worker.finished_task.connect(capture_report)
+        self._start_worker(
+            "Simulation Health Doctor",
+            doctor_task,
+            on_result=handle_doctor_result,
+        )
 
     def action_sync_kicad(self):
         """Synchronize KiCad symbol library table with verified eSim libraries."""

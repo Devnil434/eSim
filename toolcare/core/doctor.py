@@ -75,6 +75,9 @@ class DoctorReport:
     def get_items_by_severity(self, severity: Severity) -> List[DoctorCheckItem]:
         return [it for it in self.items if it.severity == severity]
 
+    def __str__(self) -> str:
+        return f"Diagnostic audit complete ({self.passed_checks}/{self.total_checks} checks passed)."
+
     def format_cli_report(self) -> str:
         """Format an aligned text report suitable for CLI and documentation."""
         lines = []

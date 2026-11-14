@@ -145,6 +145,15 @@ else:
         def __init__(self, *types):
             self.types = types
             self._slots = []
+            self._instances: Dict[int, _MockSignal] = {}
+
+        def __get__(self, instance, owner):
+            if instance is None:
+                return self
+            inst_id = id(instance)
+            if inst_id not in self._instances:
+                self._instances[inst_id] = _MockSignal(*self.types)
+            return self._instances[inst_id]
 
         def connect(self, slot: Callable):
             if slot not in self._slots:
@@ -161,8 +170,8 @@ else:
                 try:
                     slot(*args)
                 except Exception as e:
-                    # Don't let slot exception kill the emitter loop
-                    pass
+                    # Correction 6: Do not silently swallow slot exceptions
+                    raise e
 
     def pyqtSignal(*types):
         return _MockSignal(*types)

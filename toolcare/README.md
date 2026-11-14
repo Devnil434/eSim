@@ -178,7 +178,7 @@ except Exception as _err:
 
 ## 6. Running the Comprehensive Test Suite
 
-The test suite contains 114 comprehensive tests across all modules.
+The test suite contains 124 comprehensive tests across all modules.
 
 To execute the test suite in headless mode:
 ```powershell
@@ -189,7 +189,7 @@ $env:TOOLCARE_TEST_MOCK_QT="1"; python -m pytest toolcare/tests/ toolcare/gui/te
 TOOLCARE_TEST_MOCK_QT=1 python -m pytest toolcare/tests/ toolcare/gui/tests/ -v
 ```
 
-**Result:** `114 passed in 19.18s (100% pass rate)`.
+**Result:** `124 passed in 34.71s (100% pass rate)`.
 
 ---
 

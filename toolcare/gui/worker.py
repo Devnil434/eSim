@@ -26,6 +26,7 @@ class WorkerThread(QThread):
     progress = pyqtSignal(int, str)
     log_message = pyqtSignal(str)
     finished_task = pyqtSignal(bool, str)
+    result_ready = pyqtSignal(object)
 
     def __init__(
         self,
@@ -40,6 +41,7 @@ class WorkerThread(QThread):
         self.task_func = task_func
         self.args = args
         self.kwargs = kwargs
+        self.result: Any = None
         self._is_cancelled = False
         self._is_running = False
 
@@ -91,11 +93,15 @@ class WorkerThread(QThread):
                 self.log_message.emit(msg)
                 self.finished_task.emit(False, msg)
             else:
-                success_msg = str(result) if result is not None else f"Task '{self.task_name}' completed successfully."
+                self.result = result
                 logger.info("Worker task succeeded: %s", self.task_name)
+                # Correction 5: Emit complete result object to GUI thread
+                self.result_ready.emit(result)
+                success_msg = str(result) if result is not None else f"Task '{self.task_name}' completed successfully."
                 self.finished_task.emit(True, success_msg)
 
         except Exception as exc:
+            self.result = None
             err_msg = f"Task '{self.task_name}' failed: {exc}"
             logger.error(err_msg, exc_info=True)
             self.log_message.emit(f"ERROR: {exc}")

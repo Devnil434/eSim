@@ -13,8 +13,8 @@ All five implementation phases of **eSim ToolCare** have undergone rigorous auto
 
 | Metric | Target | Actual Result | Status |
 | :--- | :---: | :---: | :---: |
-| **Total Automated Tests** | 100+ | **114 / 114 Passed** | **100% SUCCESS** |
-| **Execution Duration** | < 25 seconds | **19.18 seconds** | **OPTIMAL** |
+| **Total Automated Tests** | 100+ | **124 / 124 Passed** | **100% SUCCESS** |
+| **Execution Duration** | < 35 seconds | **34.71 seconds** | **OPTIMAL** |
 | **Code Coverage Areas** | Registry, Detector, Doctor, Installer, Config, CLI, GUI | **10 Modules Covered** | **COMPLETE** |
 | **Simulated Workflows** | 5 / 5 | **5 / 5 Verified** | **STABLE** |
 | **Security Validations** | Zip-Slip, Hash Mismatch, Traversal, Symlinks | **4 / 4 Blocked** | **VERIFIED** |
@@ -22,7 +22,7 @@ All five implementation phases of **eSim ToolCare** have undergone rigorous auto
 
 ---
 
-## 2. Test Suite Breakdown (114 Tests)
+## 2. Test Suite Breakdown (124 Tests)
 
 Execution command:
 ```powershell
@@ -147,7 +147,7 @@ $env:TOOLCARE_TEST_MOCK_QT="1"; python -m pytest toolcare/tests/ toolcare/gui/te
 - `test_cli_update_dry_run_command`: Simulates update execution with zero side effects.
 - `test_cli_exit_codes`: Verifies `0` for healthy/success, `1` for missing/blocked workflows.
 
-### Module 10: `toolcare/gui/tests/test_gui.py` (12 Tests)
+### Module 10: `toolcare/gui/tests/test_gui.py` (17 Tests)
 - `test_qt_compat_headless_fallback`: Gracefully provides mock Qt layer when PyQt5/6 is not installed.
 - `test_worker_thread_lifecycle`: Emits `started_task`, `progress`, `log_message`, and `finished_task` signals.
 - `test_worker_thread_exception_handling`: Emits `error` signal and halts cleanly upon unexpected exceptions.
@@ -160,6 +160,11 @@ $env:TOOLCARE_TEST_MOCK_QT="1"; python -m pytest toolcare/tests/ toolcare/gui/te
 - `test_menu_hook_safe_attachment`: Appends `ToolCare Toolchain Manager...` to eSim `Tools` menu.
 - `test_menu_hook_idempotent`: Repeated calls do not create duplicate menu actions.
 - `test_menu_hook_non_blocking_lifecycle`: Closing dialog does not terminate parent eSim application window.
+- `test_doctor_all_12_checks_reach_gui_table`: Verifies all 12 diagnostic checks populate the GUI table with stage, check name, result, severity, details, and remediation.
+- `test_doctor_all_five_workflows_rendered`: Verifies all 5 simulation workflow cards are updated to real status and no longer show `[UNKNOWN]`.
+- `test_doctor_failed_checks_display_actual_severity`: Verifies failed checks render real severities (`CRITICAL`, `ERROR`, `WARNING`) in GUI table.
+- `test_doctor_exception_produces_visible_error`: Verifies that an unhandled background exception displays a visible error in status bar and message modal.
+- `test_doctor_empty_or_malformed_results_handled_safely`: Verifies safe handling of `None`, empty report, or malformed result objects without crashing.
 
 ---
 
