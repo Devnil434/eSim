@@ -100,6 +100,7 @@ class BackupManifest:
     timestamp: str
     created_at_utc: str
     files: List[BackupFileEntry]
+    label: str = ""
 
 
 class ConfigHandler:
@@ -109,9 +110,15 @@ class ConfigHandler:
     manages manifest-verified backups, and provides verified rollbacks.
     """
 
-    def __init__(self, esim_root: Optional[Path] = None):
+    def __init__(
+        self,
+        esim_root: Optional[Path] = None,
+        backups_dir: Optional[Path] = None,
+        backup_root: Optional[Path] = None,
+    ):
         self.esim_root = esim_root or self._find_esim_root()
-        self.backups_dir = get_esim_config_dir() / "backups"
+        b_dir = backups_dir or backup_root
+        self.backups_dir = Path(b_dir) if b_dir else get_esim_config_dir() / "backups"
 
     @staticmethod
     def _find_esim_root() -> Optional[Path]:
@@ -123,7 +130,11 @@ class ConfigHandler:
     # -------------------------------------------------------------------------
     # Backups and Verified Rollback (Corrections 3 & 4)
     # -------------------------------------------------------------------------
-    def create_backup(self, target_files: List[Path], label: str = "") -> Tuple[str, Path]:
+    def create_backup(
+        self,
+        target_files: Optional[List[Path]] = None,
+        label: str = "",
+    ) -> Tuple[str, BackupManifest]:
         """
         Create a manifest-backed snapshot of target configuration files.
         Stores original paths, timestamps, file sizes, and SHA-256 digests.
@@ -135,6 +146,15 @@ class ConfigHandler:
 
         snapshot_dir = self.backups_dir / ts_id
         snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+        if target_files is None:
+            target_files = []
+            nghdl_ini = get_nghdl_config_dir() / "config.ini"
+            if nghdl_ini.is_file():
+                target_files.append(nghdl_ini)
+            kicad_table = self.get_kicad_sym_lib_table_path()
+            if kicad_table and kicad_table.is_file():
+                target_files.append(kicad_table)
 
         manifest_entries: List[BackupFileEntry] = []
 
@@ -163,33 +183,34 @@ class ConfigHandler:
             timestamp=ts_id,
             created_at_utc=now.isoformat(),
             files=manifest_entries,
+            label=label,
         )
 
         manifest_file = snapshot_dir / "manifest.json"
         atomic_write(manifest_file, json.dumps(asdict(manifest), indent=2))
         logger.info("Created backup manifest %s with %d files", ts_id, len(manifest_entries))
 
-        return ts_id, snapshot_dir
+        return ts_id, manifest
 
-    def rollback(self, timestamp: str) -> Tuple[bool, str]:
+    def rollback(self, timestamp: str) -> List[Path]:
         """
         Roll back configuration files using a timestamped backup manifest.
         Correction 4: Verifies backup file integrity (SHA-256) before restoring.
         """
         snapshot_dir = self.backups_dir / timestamp
         if not snapshot_dir.is_dir():
-            return False, f"Backup snapshot '{timestamp}' not found in {self.backups_dir}."
+            raise FileNotFoundError(f"Backup snapshot '{timestamp}' not found in {self.backups_dir}.")
 
         manifest_path = snapshot_dir / "manifest.json"
         if not manifest_path.is_file():
-            return False, f"Backup manifest corrupted or missing in {snapshot_dir}."
+            raise FileNotFoundError(f"Backup manifest corrupted or missing in {snapshot_dir}.")
 
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             files = [BackupFileEntry(**item) for item in data.get("files", [])]
         except Exception as exc:
-            return False, f"Failed to parse backup manifest: {exc}"
+            raise ConfigSecurityError(f"Failed to parse backup manifest: {exc}")
 
         # Step 1: Pre-verification of all backup files (Correction 4)
         for entry in files:
@@ -201,21 +222,21 @@ class ConfigHandler:
             current_sha = compute_file_sha256(b_path)
             if current_sha.lower() != entry.sha256.lower():
                 raise ConfigSecurityError(
-                    f"Rollback aborted: Backup file '{entry.backup_file}' failed integrity check! "
+                    f"Integrity verification failed for backup '{entry.backup_file}'! "
                     f"Expected SHA-256: {entry.sha256}, Computed: {current_sha}."
                 )
 
         # Step 2: Restore verified files
-        restored = []
+        restored: List[Path] = []
         for entry in files:
             b_path = snapshot_dir / entry.backup_file
             orig_target = Path(entry.original_path)
             orig_target.parent.mkdir(parents=True, exist_ok=True)
             atomic_write(orig_target, b_path.read_text(encoding="utf-8", errors="replace"))
-            restored.append(str(orig_target))
+            restored.append(orig_target)
 
         logger.info("Successfully rolled back %d files from snapshot %s", len(restored), timestamp)
-        return True, f"Successfully restored {len(restored)} configuration files from {timestamp}."
+        return restored
 
     # -------------------------------------------------------------------------
     # Targeted In-Place INI Updating (Correction 1: Preserve Comments & Format)
@@ -293,6 +314,12 @@ class ConfigHandler:
     # -------------------------------------------------------------------------
     # KiCad sym-lib-table S-Expression Synchronization (Corrections 2 & 9)
     # -------------------------------------------------------------------------
+    @staticmethod
+    def get_kicad_sym_lib_table_path() -> Optional[Path]:
+        """Locate global KiCad sym-lib-table across version folders and OS paths."""
+        from toolcare.core.doctor import SimulationDoctor
+        return SimulationDoctor.find_kicad_sym_lib_table()
+
     def get_actual_esim_symbol_libraries(self) -> Dict[str, Tuple[Path, str]]:
         """
         Correction 9: Validate proposed KiCad library entries against actual eSim source.
@@ -317,12 +344,17 @@ class ConfigHandler:
 
         return libs
 
-    @staticmethod
-    def sync_kicad_sym_lib_table(table_path: Path, libraries: Dict[str, Tuple[Path, str]]) -> int:
+    def sync_kicad_sym_lib_table(
+        self,
+        table_path: Path,
+        libraries: Optional[Dict[str, Tuple[Path, str]]] = None,
+    ) -> int:
         """
         Correction 2: Safe targeted S-expression editing for KiCad sym-lib-table.
         Avoids broad regex surgery. Inserts or updates libraries in place and avoids duplicates.
         """
+        if libraries is None:
+            libraries = self.get_actual_esim_symbol_libraries()
         if not table_path.parent.is_dir():
             table_path.parent.mkdir(parents=True, exist_ok=True)
 

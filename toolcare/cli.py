@@ -325,6 +325,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"%(prog)s {__version__}",
     )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch the ToolCare graphical management interface (PyQt5/PyQt6)",
+    )
 
     subparsers = parser.add_subparsers(dest="subcommand", title="subcommands", description="valid operations")
 
@@ -376,6 +381,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     """CLI entrypoint."""
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.gui:
+        from toolcare.gui import launch_gui
+        return launch_gui()
 
     if not args.subcommand:
         parser.print_help()
